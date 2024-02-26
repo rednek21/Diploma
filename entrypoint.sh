@@ -11,14 +11,7 @@ then
     echo "PostgreSQL started"
 fi
 
-python manage.py flush --no-input
-python manage.py migrate
-python manage.py loaddata categories.json
-python manage.py loaddata projects.json
-
-if [ "$DEBUG" = "False" ]
-then
-    python manage.py collectstatic --noinput
-fi
+sleep 5
+python main.py
 
 exec "$@"

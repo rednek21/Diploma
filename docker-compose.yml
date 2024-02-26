@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+   image: postgres:16.1-alpine3.19
+   volumes:
+     - postgres_data:/var/lib/postgresql/data/
+   environment:
+     - POSTGRES_USER=${POSTGRES_USER}
+     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+     - POSTGRES_DB=${POSTGRES_DB}
+
+  cache:
+   image: redis:7.2.4-alpine3.19
+   environment:
+     - REDIS_HOST=${REDIS_HOST}
+     - REDIS_PORT=${REDIS_PORT}
+     - REDIS_DATABASES=1
+   volumes:
+     - redis_data:/data
+
+volumes:
+ postgres_data:
+ redis_data:

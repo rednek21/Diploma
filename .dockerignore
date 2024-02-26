@@ -1,0 +1,12 @@
+.git
+.gitignore
+
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+.idea
+__pycache__/
+*.py[cod]
+
+*.so
