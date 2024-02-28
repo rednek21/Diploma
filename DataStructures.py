@@ -54,9 +54,12 @@ class PostgreSQL:
         self.connection.commit()
         cursor.close()
         if data:
-            data = tuple(str(value) for value in data)
-            data_str = ' : '.join(data)
-            return data_str
+            key_value = tuple(str(value) for value in data)
+            data = {
+                    'key': key_value[0],
+                    'value': key_value[1]
+                    }
+            return data
         else:
             return None
 
