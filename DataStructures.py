@@ -26,14 +26,14 @@ class PostgreSQL:
                 host=self.host,
                 port=self.port
             )
-            print("Connected to PostgreSQL database!")
+            print("\nConnected to PostgreSQL database!")
         except psycopg2.Error as e:
             print("Unable to connect to database:", e)
 
     def close(self):
         if self.connection:
             self.connection.close()
-            print("Connection to PostgreSQL closed.")
+            print("\nConnection to PostgreSQL closed.")
 
     def execute_query(self, query):
         cursor = self.connection.cursor()
