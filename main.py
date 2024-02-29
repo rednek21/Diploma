@@ -41,27 +41,35 @@ redis_conn.connect()
 # Проверка наличия данных в БД: если данные есть -> вывести, если данных НЕТ -> добавить + вывести
 for i in range(10):
     random_data = get_random_data()
+    print('\n' + str(random_data))
 
-    # if not hash_table[f'{random_data["key"]}']:
-    #     key = random_data["key"]
-    #     value = random_data["value"]
-    #     hash_table.update({key : value})
-    #     print(hash_table)
-    #     print(f'Successful set to hash-table {key} : {value}')
+    key = random_data["key"]
+    value = random_data["value"]
+
+    if not key in hash_table:
+        hash_table.update({key : value})
+        print(f'\nSuccessful set to hash-table {key} : {value}')
+    else:
+        data = {
+            'key': key,
+            'value': hash_table.get(key)
+        }
+        print(f'\nGot from hash-table {data["key"]} : {data["value"]}')
+
 
     if not postgres_conn.get_data(random_data["key"]):
-        postgres_conn.set_data(random_data["key"], random_data["value"])
-        print(f'Successful set to PostgreSQL {random_data["key"]} : {random_data["value"]}')
+        postgres_conn.set_data(key, value)
+        print(f'Successful set to PostgreSQL {key} : {value}')
     else:
-        data = postgres_conn.get_data(random_data["key"])
+        data = postgres_conn.get_data(key)
         print(f'Got from PostgreSQL {data["key"]} : {data["value"]}')
 
-    if not redis_conn.get_data(random_data["key"]):
-        redis_conn.set_data(random_data["key"], random_data["value"])
-        print(f'Successful set to Redis {random_data["key"]} : {random_data["value"]}')
+    if not redis_conn.get_data(key):
+        redis_conn.set_data(key, value)
+        print(f'Successful set to Redis {key} : {value}')
     else:
-        data = redis_conn.get_data(random_data['key'])
-        print(f'Got from Redis {random_data["key"]} : {data}')
+        data = redis_conn.get_data(key)
+        print(f'Got from Redis {key} : {data}')
 
 
 # Закрытие соединения с БД
