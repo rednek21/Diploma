@@ -63,6 +63,13 @@ class PostgreSQL:
         else:
             return None
 
+    def get_database_size_bytes(self):
+        cursor = self.connection.cursor()
+        cursor.execute(f"SELECT pg_total_relation_size('{self.dbname}')")
+        size_bytes = cursor.fetchone()[0]
+        cursor.close()
+        return size_bytes
+
 
 class Redis:
     def __init__(self, host, port, db):
@@ -92,3 +99,7 @@ class Redis:
 
     def get_data(self, key):
         return self.connection.get(key)
+
+    def get_total_memory_usage(self):
+        info = self.connection.info()
+        return info['used_memory_dataset']
