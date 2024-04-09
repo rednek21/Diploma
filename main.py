@@ -89,7 +89,7 @@ for i in range(2000):
 # print('\nStart searching data in structures\n')
 
 # Поиск данных в заполненных структурах
-for i in range(1000):
+for i in range(2000):
     random_data = get_random_data()
     # print('\n' + str(random_data))
 
@@ -122,6 +122,7 @@ for i in range(1000):
         else:
             # print(f'Key {key} not found in PostgreSQL')
             postgres_conn.set_data(key, value)
+            redis_conn.set_data(key, value)
             # print(f'\nSuccessful set to PostgreSQL {key} : {value}')
     else:
         start = time.monotonic()
@@ -131,16 +132,20 @@ for i in range(1000):
         # print(f'Got from Redis {key} : {data} in {end-start} seconds')
 
 
+avg_db_search_time = mean(db_time)
 print(f'\nПроизведено замеров для БД: {len(db_time)}')
-print(f'Оценка Мат. ожидания времени поиска в БД: {round(mean(db_time), 10)}')
+print(f'Оценка Мат. ожидания времени поиска в БД: {round(avg_db_search_time, 10)}')
 print(f'Объем данных в БД: {postgres_conn.get_database_size_bytes()} bytes')
 
+avg_redis_search_time = mean(redis_time)
 print(f'\nПроизведено замеров для Redis: {len(redis_time)}')
-print(f'Оценка Мат. ожидания времени поиска в Redis: {round(mean(redis_time), 10)}')
+print(f'Оценка Мат. ожидания времени поиска в Redis: {round(avg_redis_search_time, 10)}')
 print(f'Объем данных в Redis: {redis_conn.get_total_memory_usage()} bytes')
 
+
+avg_ht_search_time = mean(hash_table_time)
 print(f'\nПроизведено замеров для хэш-таблицы: {len(hash_table_time)}')
-print(f'Оценка Мат. ожидания времени поиска в хэш-таблице: {mean(hash_table_time):.10f}')
+print(f'Оценка Мат. ожидания времени поиска в хэш-таблице: {avg_ht_search_time:.10f}')
 print(f'Объем данных в хэш-таблице: {getsizeof(hash_table)} bytes')
 
 
