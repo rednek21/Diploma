@@ -1,14 +1,13 @@
 import os
-from random import uniform
 import time
+from random import uniform
 from sys import getsizeof
 
-from DataStructures import PostgreSQL, Redis
 from dotenv import load_dotenv
-
-from common import get_random_data
-
 from statistics import mean
+
+from DataStructures import PostgreSQL, Redis
+from common import get_random_data
 
 load_dotenv()
 
