@@ -1,14 +1,14 @@
 import os
+from random import uniform
 import time
-
 from sys import getsizeof
+
+from DataStructures import PostgreSQL, Redis
 from dotenv import load_dotenv
 
-from statistics import mean
-from random import uniform
-
 from common import get_random_data
-from DataStructures import PostgreSQL, Redis
+
+from statistics import mean
 
 load_dotenv()
 
@@ -36,32 +36,43 @@ redis_conn = Redis(host=env.get('REDIS_HOST'),
                    port=env.get('REDIS_PORT'),
                    db=1)
 
-# Инициализация хэщ-таблицы
+# Инициализация хэш-таблицы
 hash_table = {}
 
 # Подключение к БД и создание таблицы
 postgres_conn.connect()
 postgres_conn.create_table()
 
-# Подлкючение к Redis
+# Подключение к Redis
 redis_conn.connect()
 
-# Списки для хранения замеров времени получения данных в БД, Redis и хэш-таблице
-db_time = []
-redis_time = []
-hash_table_time = []
+# Переменные для хранения средних замеров времени
+avg_db_search_time = {}
+avg_redis_search_time = {}
+avg_ht_search_time = {}
 
-# Всего записй занести в сруктуры
-# records_number = [1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000]
-# records_number = [1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000]
+# Переменные для хранения замеров памяти
+db_memory_usage = {}
+redis_memory_usage = {}
+ht_memory_usage = {}
+
+# Всего записей занести в структуры
 records_number = [100, 200, 300]
-
-# Вероятности внесения новой записи в определенную структуру
 filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
 
-# Заполнение структур данных разными объемами
+# Заполнение структур данных разными объемами и вероятностными распределениями
 for record_number in records_number:
     for filling_probability in filling_probabilities:
+        # Инициализация временных списков
+        db_time = []
+        redis_time = []
+        hash_table_time = []
+
+        # Инициализация списков для памяти
+        db_memory = []
+        redis_memory = []
+        ht_memory = []
+
         print(f'Заполнение структур. Количество элементов: {record_number}')
         for i in range(record_number):
             random_data = get_random_data(record_number)
@@ -73,17 +84,18 @@ for record_number in records_number:
             # и в хэш-таблицу с вероятностью (1 - filling_probabilities)
             if round(uniform(0, 1), 2) < filling_probability:
                 if not postgres_conn.get_data(key):
+                    start = time.monotonic()
                     postgres_conn.set_data(key, value)
+                    end = time.monotonic()
+                    db_time.append(end - start)
+                    db_memory.append(getsizeof(value))
             else:
                 if key not in hash_table:
+                    start = time.monotonic()
                     hash_table.update({key: value})
-
-            # if not redis_conn.get_data(key):
-            #     redis_conn.set_data(key, value)
-            #     print(f'Successful set to Redis {key} : {value}')
-            # else:
-            #     data = redis_conn.get_data(key)
-            #     print(f'Got from Redis {key} : {data}')
+                    end = time.monotonic()
+                    hash_table_time.append(end - start)
+                    ht_memory.append(getsizeof(value))
 
         print('Данные внесены. Поиск данных...')
         # Поиск данных в заполненных структурах
@@ -99,44 +111,49 @@ for record_number in records_number:
                 value = hash_table.get(key)
                 end = time.monotonic()
                 hash_table_time.append(end - start)
-            # else:
-            #     hash_table.update({key: value})
 
             # Поиск в Redis, если не найдено -> поиск в БД, если не найдено -> запись данных в БД
             if not redis_conn.get_data(key):
                 if postgres_conn.get_data(key):
-
                     start = time.monotonic()
                     db_data = postgres_conn.get_data(key)
                     end = time.monotonic()
                     db_time.append(end - start)
-
+                    db_memory.append(getsizeof(db_data['value']))
                     redis_conn.set_data(db_data['key'], db_data['value'])
                 else:
+                    start = time.monotonic()
                     postgres_conn.set_data(key, value)
+                    end = time.monotonic()
+                    db_time.append(end - start)
+                    db_memory.append(getsizeof(value))
                     redis_conn.set_data(key, value)
             else:
                 start = time.monotonic()
                 data = redis_conn.get_data(key)
                 end = time.monotonic()
                 redis_time.append(end - start)
+                redis_memory.append(getsizeof(data))
 
+        # Расчет средних значений времени
+        avg_db_search_time[(record_number, filling_probability)] = mean(db_time)
+        avg_redis_search_time[(record_number, filling_probability)] = mean(redis_time)
+        avg_ht_search_time[(record_number, filling_probability)] = mean(hash_table_time)
+
+        # Замеры памяти
+        db_memory_usage[(record_number, filling_probability)] = sum(db_memory)
+        redis_memory_usage[(record_number, filling_probability)] = sum(redis_memory)
+        ht_memory_usage[(record_number, filling_probability)] = sum(ht_memory)
+
+        # Вывод результатов
         print(f'\nРезультаты при вероятности добавления новой записи в БД: {filling_probability}')
+        print(f'Среднее время поиска в БД: {avg_db_search_time[(record_number, filling_probability)]:.10f} сек')
+        print(f'Среднее время поиска в Redis: {avg_redis_search_time[(record_number, filling_probability)]:.10f} сек')
+        print(f'Среднее время поиска в хэш-таблице: {avg_ht_search_time[(record_number, filling_probability)]:.10f} сек')
 
-        avg_db_search_time = mean(db_time)
-        print(f'\nПроизведено замеров для БД: {len(db_time)}')
-        print(f'Оценка Мат. ожидания времени поиска в БД: {round(avg_db_search_time, 10)}')
-        print(f'Объем данных в БД: {postgres_conn.get_database_size_bytes()} bytes')
-
-        avg_redis_search_time = mean(redis_time)
-        print(f'\nПроизведено замеров для Redis: {len(redis_time)}')
-        print(f'Оценка Мат. ожидания времени поиска в Redis: {round(avg_redis_search_time, 10)}')
-        print(f'Объем данных в Redis: {redis_conn.get_total_memory_usage()} bytes')
-
-        avg_ht_search_time = mean(hash_table_time)
-        print(f'\nПроизведено замеров для хэш-таблицы: {len(hash_table_time)}')
-        print(f'Оценка Мат. ожидания времени поиска в хэш-таблице: {avg_ht_search_time:.10f}')
-        print(f'Объем данных в хэш-таблице: {getsizeof(hash_table)} bytes')
+        print(f'Объем памяти БД: {db_memory_usage[(record_number, filling_probability)]} байт')
+        print(f'Объем памяти Redis: {redis_memory_usage[(record_number, filling_probability)]} байт')
+        print(f'Объем памяти хэш-таблицы: {ht_memory_usage[(record_number, filling_probability)]} байт\n')
 
         print('\nОчистка данных...')
         hash_table.clear()
