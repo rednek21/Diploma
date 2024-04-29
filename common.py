@@ -1,8 +1,9 @@
 import random
 
-def get_random_data():
-    key = random.randint(0, 100)
-    value = random.randint(0, 1000000)
+
+def get_random_data(limit):
+    key = random.randint(0, limit)
+    value = random.randint(0, limit)
 
     return {'key': key,
             'value': value}

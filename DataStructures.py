@@ -56,9 +56,9 @@ class PostgreSQL:
         if data:
             key_value = tuple(str(value) for value in data)
             data = {
-                    'key': key_value[0],
-                    'value': key_value[1]
-                    }
+                'key': key_value[0],
+                'value': key_value[1]
+            }
             return data
         else:
             return None
@@ -69,6 +69,11 @@ class PostgreSQL:
         size_bytes = cursor.fetchone()[0]
         cursor.close()
         return size_bytes
+
+    def clear_data(self):
+        cursor = self.connection.cursor()
+        cursor.execute(f"DELETE FROM {self.dbname}")
+        cursor.close()
 
 
 class Redis:
@@ -103,3 +108,6 @@ class Redis:
     def get_total_memory_usage(self):
         info = self.connection.info()
         return info['used_memory_dataset']
+
+    def clear_data(self):
+        self.connection.flushdb()
