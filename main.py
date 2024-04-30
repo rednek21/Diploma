@@ -193,7 +193,7 @@ plt.xlabel('Filling Probability')
 plt.ylabel('Average Search Time (seconds)')
 plt.legend()
 plt.grid(True)
-plt.savefig('search_time_vs_filling_probability.png')  # Сохранение графика в файл
+plt.savefig('app_results/search_time_vs_filling_probability.png')
 
 plt.figure(figsize=(10, 6))
 plt.plot(probabilities, db_memory_usages, label='DB Memory Usage')
@@ -204,4 +204,6 @@ plt.xlabel('Filling Probability')
 plt.ylabel('Memory Usage (bytes)')
 plt.legend()
 plt.grid(True)
-plt.savefig('memory_usage_vs_filling_probability.png')  # Сохранение графика в файл
+plt.savefig('app_results/memory_usage_vs_filling_probability.png')
+
+
