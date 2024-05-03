@@ -23,4 +23,6 @@ WORKDIR /app
 COPY . .
 
 RUN chmod +x ./entrypoint.sh
+RUN mkdir -p /app/results
+
 ENTRYPOINT ["sh", "entrypoint.sh"]

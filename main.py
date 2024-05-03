@@ -5,6 +5,7 @@ from sys import getsizeof
 
 from dotenv import load_dotenv
 from statistics import mean
+import matplotlib.pyplot as plt
 
 from DataStructures import PostgreSQL, Redis
 from common import get_random_data
@@ -58,6 +59,15 @@ ht_memory_usage = {}
 # Всего записей занести в структуры
 records_number = [100, 200, 300]
 filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
+
+# Lists to store data for plotting
+probabilities = []
+avg_db_search_times = []
+avg_redis_search_times = []
+avg_ht_search_times = []
+db_memory_usages = []
+redis_memory_usages = []
+ht_memory_usages = []
 
 # Заполнение структур данных разными объемами и вероятностными распределениями
 for record_number in records_number:
@@ -144,6 +154,15 @@ for record_number in records_number:
         redis_memory_usage[(record_number, filling_probability)] = sum(redis_memory)
         ht_memory_usage[(record_number, filling_probability)] = sum(ht_memory)
 
+        # Append data for plotting
+        probabilities.append(filling_probability)
+        avg_db_search_times.append(avg_db_search_time[(record_number, filling_probability)])
+        avg_redis_search_times.append(avg_redis_search_time[(record_number, filling_probability)])
+        avg_ht_search_times.append(avg_ht_search_time[(record_number, filling_probability)])
+        db_memory_usages.append(db_memory_usage[(record_number, filling_probability)])
+        redis_memory_usages.append(redis_memory_usage[(record_number, filling_probability)])
+        ht_memory_usages.append(ht_memory_usage[(record_number, filling_probability)])
+
         # Вывод результатов
         print(f'\nРезультаты при вероятности добавления новой записи в БД: {filling_probability}')
         print(f'Среднее время поиска в БД: {avg_db_search_time[(record_number, filling_probability)]:.10f} сек')
@@ -163,3 +182,49 @@ for record_number in records_number:
 # Закрытие соединения с БД
 postgres_conn.close()
 redis_conn.close()
+
+# Сохранение графиков в файлы
+plt.figure(figsize=(10, 6))
+
+# График для БД
+for probability in filling_probabilities:
+    x = [db_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_db_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'DB Fill Probability: {probability}')
+
+plt.title('Average Search Time vs Memory Usage for DB')
+plt.xlabel('Memory Usage (bytes)')
+plt.ylabel('Average Search Time (seconds)')
+plt.legend()
+plt.grid(True)
+plt.savefig('app_results/db_search_time_vs_memory_usage.png')
+
+plt.figure(figsize=(10, 6))
+
+# График для Redis
+for probability in filling_probabilities:
+    x = [redis_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_redis_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'Redis Fill Probability: {probability}')
+
+plt.title('Average Search Time vs Memory Usage for Redis')
+plt.xlabel('Memory Usage (bytes)')
+plt.ylabel('Average Search Time (seconds)')
+plt.legend()
+plt.grid(True)
+plt.savefig('app_results/redis_search_time_vs_memory_usage.png')
+
+plt.figure(figsize=(10, 6))
+
+# График для хэш-таблицы
+for probability in filling_probabilities:
+    x = [ht_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_ht_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'Hash Table Fill Probability: {1 - probability}')
+
+plt.title('Average Search Time vs Memory Usage for Hash Table')
+plt.xlabel('Memory Usage (bytes)')
+plt.ylabel('Average Search Time (seconds)')
+plt.legend()
+plt.grid(True)
+plt.savefig('app_results/ht_search_time_vs_memory_usage.png')
