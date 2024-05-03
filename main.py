@@ -185,25 +185,46 @@ redis_conn.close()
 
 # Сохранение графиков в файлы
 plt.figure(figsize=(10, 6))
-plt.plot(probabilities, avg_db_search_times, label='Average DB Search Time')
-plt.plot(probabilities, avg_redis_search_times, label='Average Redis Search Time')
-plt.plot(probabilities, avg_ht_search_times, label='Average Hash Table Search Time')
-plt.title('Average Search Time vs Filling Probability')
-plt.xlabel('Filling Probability')
+
+# График для БД
+for probability in filling_probabilities:
+    x = [db_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_db_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'DB Fill Probability: {probability}')
+
+plt.title('Average Search Time vs Memory Usage for DB')
+plt.xlabel('Memory Usage (bytes)')
 plt.ylabel('Average Search Time (seconds)')
 plt.legend()
 plt.grid(True)
-plt.savefig('app_results/search_time_vs_filling_probability.png')
+plt.savefig('app_results/db_search_time_vs_memory_usage.png')
 
 plt.figure(figsize=(10, 6))
-plt.plot(probabilities, db_memory_usages, label='DB Memory Usage')
-plt.plot(probabilities, redis_memory_usages, label='Redis Memory Usage')
-plt.plot(probabilities, ht_memory_usages, label='Hash Table Memory Usage')
-plt.title('Memory Usage vs Filling Probability')
-plt.xlabel('Filling Probability')
-plt.ylabel('Memory Usage (bytes)')
+
+# График для Redis
+for probability in filling_probabilities:
+    x = [redis_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_redis_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'Redis Fill Probability: {probability}')
+
+plt.title('Average Search Time vs Memory Usage for Redis')
+plt.xlabel('Memory Usage (bytes)')
+plt.ylabel('Average Search Time (seconds)')
 plt.legend()
 plt.grid(True)
-plt.savefig('app_results/memory_usage_vs_filling_probability.png')
+plt.savefig('app_results/redis_search_time_vs_memory_usage.png')
 
+plt.figure(figsize=(10, 6))
 
+# График для хэш-таблицы
+for probability in filling_probabilities:
+    x = [ht_memory_usage[(record_number, probability)] for record_number in records_number]
+    y = [avg_ht_search_time[(record_number, probability)] for record_number in records_number]
+    plt.plot(x, y, label=f'Hash Table Fill Probability: {1 - probability}')
+
+plt.title('Average Search Time vs Memory Usage for Hash Table')
+plt.xlabel('Memory Usage (bytes)')
+plt.ylabel('Average Search Time (seconds)')
+plt.legend()
+plt.grid(True)
+plt.savefig('app_results/ht_search_time_vs_memory_usage.png')
