@@ -7,6 +7,8 @@ services:
       - .env
     depends_on:
       - db
+    volumes:
+      - ./app_results:/app/app_results
 
   db:
    image: postgres:16.1-alpine3.19
@@ -29,3 +31,4 @@ services:
 volumes:
  postgres_data:
  redis_data:
+ app_results:
