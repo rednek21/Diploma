@@ -62,7 +62,7 @@ redis_misses = {}
 ht_misses = {}
 
 # Всего записей занести в структуры
-records_number = [100, 200, 300, 400, 500]
+records_number = [100, 200, 300]
 filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
 
 # Инициализация списков для хранения данных для графиков
@@ -74,7 +74,6 @@ db_misses_data = {filling_probability: [] for filling_probability in filling_pro
 redis_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 ht_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 
-probabilities = []
 
 # Заполнение структур данных разными объемами и вероятностными распределениями
 for filling_probability in filling_probabilities:
@@ -125,7 +124,6 @@ for filling_probability in filling_probabilities:
         # Поиск данных в заполненных структурах
         for i in range(record_number):
             random_data = get_random_data(record_number * 100)
-
             key = random_data["key"]
             value = random_data["value"]
 
@@ -134,7 +132,7 @@ for filling_probability in filling_probabilities:
                 start = time.monotonic()
                 value = hash_table.get(key)
                 end = time.monotonic()
-                hash_table_time.append(end - start)
+                hash_table_time.append(end - start)  # Обновление временного списка
             else:
                 ht_misses_counter += 1  # Увеличение счетчика промахов для хэш-таблицы
 
@@ -184,17 +182,19 @@ for filling_probability in filling_probabilities:
         ht_misses_data[filling_probability].append(ht_misses_counter)
 
         # Вывод результатов
-        print(f'\nРезультаты при вероятности добавления новой записи в БД: {filling_probability}')
-        print(f'Среднее время поиска в БД: {avg_db_search_time:.10f} сек')
-        print(f'Среднее время поиска в Redis: {avg_redis_search_time:.10f} сек')
-        print(f'Среднее время поиска в хэш-таблице: {avg_ht_search_time:.10f} сек')
-
-        print(f'Объем памяти БД: {db_memory_usage[(record_number, filling_probability)]} байт')
-        print(f'Объем памяти Redis: {redis_memory_usage[(record_number, filling_probability)]} байт')
-        print(f'Объем памяти хэш-таблицы: {ht_memory_usage[(record_number, filling_probability)]} байт')
-        print(f'Количество промахов в БД: {db_misses_counter}')
-        print(f'Количество промахов в Redis: {redis_misses_counter}')
-        print(f'Количество промахов в хэш-таблице: {ht_misses_counter}\n')
+        # print(f'\nРезультаты при вероятности добавления новой записи в БД: {filling_probability}')
+        # print(f'Среднее время поиска в БД: {avg_db_search_time:.10f} сек')
+        # print(f'Среднее время поиска в Redis: {avg_redis_search_time:.10f} сек')
+        # print(f'Среднее время поиска в хэш-таблице: {avg_ht_search_time:.10f} сек')
+        # print(f'Время поиска а текущей итерации: {hash_table_time} сек')
+        # print(f'Средние значения времени поиска на разных итерациях: {ht_search_times} сек')
+        #
+        # print(f'Объем памяти БД: {db_memory_usage[(record_number, filling_probability)]} байт')
+        # print(f'Объем памяти Redis: {redis_memory_usage[(record_number, filling_probability)]} байт')
+        # print(f'Объем памяти хэш-таблицы: {ht_memory_usage[(record_number, filling_probability)]} байт')
+        # print(f'Количество промахов в БД: {db_misses_counter}')
+        # print(f'Количество промахов в Redis: {redis_misses_counter}')
+        # print(f'Количество промахов в хэш-таблице: {ht_misses_counter}\n')
 
         print('\nОчистка данных...')
         hash_table.clear()
@@ -212,27 +212,48 @@ redis_conn.close()
 for filling_probability in filling_probabilities:
     plt.figure(figsize=(10, 6))
     x = records_number
-    plt.plot(x, db_search_times[filling_probability], label=f'DB')
-    plt.plot(x, redis_search_times[filling_probability], label=f'Redis')
-    plt.plot(x, ht_search_times[filling_probability], label=f'Hash Table')
-    plt.title(f'Average Search Time vs Number of Records (Fill Probability: {filling_probability})')
-    plt.xlabel('Number of Records')
-    plt.ylabel('Average Search Time (seconds)')
+
+    # Получаем средние значения времени поиска для каждой структуры данных
+    avg_db_search_time = mean(db_search_times[filling_probability])
+    avg_redis_search_time = mean(redis_search_times[filling_probability])
+    avg_ht_search_time = mean(ht_search_times[filling_probability])
+
+    plt.plot(x, [t * 1e6 for t in db_search_times[filling_probability]],
+             label=f'БД (Среднее: {avg_db_search_time * 1e6:.2f} мс)')  # Перевод в наносекунды
+    plt.plot(x, [t * 1e6 for t in redis_search_times[filling_probability]],
+             label=f'Redis (Среднее: {avg_redis_search_time * 1e6:.2f} мс)')  # Перевод в наносекунды
+    plt.plot(x, [t * 1e6 for t in ht_search_times[filling_probability]],
+             label=f'Хэш-таблица (Среднее: {avg_ht_search_time * 1e6:.2f} мс)')  # Перевод в наносекунды
+
+    plt.title(
+        f'Среднее время доступа vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+    plt.xlabel('Количество записей')
+    plt.ylabel('Среднее время доступа (наносекунды)')
     plt.legend()
     plt.grid(True)
-    plt.savefig(f'app_results/search_time_vs_records_filling_{filling_probability}.png')
+    plt.savefig(f'app_results/время_доступа_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
     plt.close()
 
 # Графики для количества промахов
 for filling_probability in filling_probabilities:
     plt.figure(figsize=(10, 6))
-    plt.plot(probabilities, db_misses_data[filling_probability], label=f'DB')
-    plt.plot(probabilities, redis_misses_data[filling_probability], label=f'Redis')
-    plt.plot(probabilities, ht_misses_data[filling_probability], label=f'Hash Table')
-    plt.title(f'Number of Misses vs Fill Probability (Fill Probability: {filling_probability})')
-    plt.xlabel('Fill Probability')
-    plt.ylabel('Number of Misses')
+    x = records_number
+
+    # Получаем средние значения количества промахов для каждой структуры данных
+    avg_db_misses = mean(db_misses_data[filling_probability])
+    avg_redis_misses = mean(redis_misses_data[filling_probability])
+    avg_ht_misses = mean(ht_misses_data[filling_probability])
+
+    # Построение графиков для каждой структуры данных
+    plt.plot(x, db_misses_data[filling_probability], label=f'БД (Среднее: {avg_db_misses:.2f})')
+    plt.plot(x, redis_misses_data[filling_probability], label=f'Redis (Среднее: {avg_redis_misses:.2f})')
+    plt.plot(x, ht_misses_data[filling_probability], label=f'Хэш-таблица (Среднее: {avg_ht_misses:.2f})')
+
+    plt.title(f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"})')
+    plt.xlabel('Количество записей')
+    plt.ylabel('Количество промахов')
     plt.legend()
     plt.grid(True)
-    plt.savefig(f'app_results/misses_vs_fill_probability_filling_{filling_probability}.png')
+    plt.savefig(f'app_results/промахи_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
     plt.close()
+
