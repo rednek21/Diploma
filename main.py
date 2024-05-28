@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 import time
 from random import uniform
@@ -58,7 +59,9 @@ redis_misses = {}
 ht_misses = {}
 
 # Всего записей занести в структуры
-records_number = [100, 250, 500, 1000, 5000]
+records_number = [1_000, 5_000, 10_000, 20_000, 50_000, 100_000,
+                  200_000, 500_000, 1_000_000, 2_000_000, 5_000_000,
+                  10_000_000]
 filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
 
 # Инициализация списков для хранения данных для графиков
@@ -72,98 +75,107 @@ db_misses_data = {filling_probability: [] for filling_probability in filling_pro
 redis_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 ht_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 
-# Заполнение структур данных разными объемами и вероятностными распределениями
-for filling_probability in filling_probabilities:
-    probabilities.append(filling_probability)
-    for record_number in records_number:
-        db_time = []
-        redis_time = []
-        hash_table_time = []
+pool = multiprocessing.Pool()
 
-        db_memory = []
-        redis_memory = []
-        ht_memory = []
 
-        db_misses_counter = 0
-        redis_misses_counter = 0
-        ht_misses_counter = 0
+def calculating():
+    # Заполнение структур данных разными объемами и вероятностными распределениями
+    for filling_probability in filling_probabilities:
+        probabilities.append(filling_probability)
+        for record_number in records_number:
+            db_time = []
+            redis_time = []
+            hash_table_time = []
 
-        print(f'Заполнение структур. Количество элементов: {record_number}, Вероятность заполнения БД: {filling_probability}')
-        for i in range(record_number):
-            random_data = get_random_data(record_number)
-            key = random_data["key"]
-            value = random_data["value"]
+            db_memory = []
+            redis_memory = []
+            ht_memory = []
 
-            if round(uniform(0, 1), 2) < filling_probability:
-                if not postgres_conn.get_data(key):
-                    postgres_conn.set_data(key, value)
-                    db_memory.append(getsizeof(value))
-                    if round(uniform(0, 1), 2) > filling_probability:
-                        if not redis_conn.get_data(key):
-                            redis_conn.set_data(key, value)
-                            redis_memory.append(getsizeof(value))
-            else:
-                if key not in hash_table:
-                    hash_table.update({key: value})
-                    ht_memory.append(getsizeof(value))
+            db_misses_counter = 0
+            redis_misses_counter = 0
+            ht_misses_counter = 0
 
-        print('Данные внесены. Поиск данных...')
-        for i in range(record_number):
-            random_data = get_random_data(record_number)
-            key = random_data["key"]
-            value = random_data["value"]
+            print(
+                f'Заполнение структур. Количество элементов: {record_number}, Вероятность заполнения БД: {filling_probability}')
+            for i in range(record_number):
+                random_data = get_random_data(record_number)
+                key = random_data["key"]
+                value = random_data["value"]
 
-            if key in hash_table:
-                start = time.monotonic()
-                value = hash_table.get(key)
-                end = time.monotonic()
-                hash_table_time.append(end - start)
-            else:
-                ht_misses_counter += 1
-                hash_table.update({key: value})
-
-            if not redis_conn.get_data(key):
-                redis_misses_counter += 1
-                start = time.monotonic()
-                db_data = postgres_conn.get_data(key)
-                if db_data:
-                    end = time.monotonic()
-                    db_time.append(end - start)
-                    db_memory.append(getsizeof(db_data['value']))
-                    redis_conn.set_data(db_data['key'], db_data['value'])
+                if round(uniform(0, 1), 2) < filling_probability:
+                    if not postgres_conn.get_data(key):
+                        postgres_conn.set_data(key, value)
+                        db_memory.append(getsizeof(value))
+                        if round(uniform(0, 1), 2) > filling_probability:
+                            if not redis_conn.get_data(key):
+                                redis_conn.set_data(key, value)
+                                redis_memory.append(getsizeof(value))
                 else:
-                    db_misses_counter += 1
-                    postgres_conn.set_data(key, value)
-                    db_memory.append(getsizeof(value))
-                    redis_conn.set_data(key, value)
-            else:
-                start = time.monotonic()
-                data = redis_conn.get_data(key)
-                end = time.monotonic()
-                redis_time.append(end - start)
-                redis_memory.append(getsizeof(data))
+                    if key not in hash_table:
+                        hash_table.update({key: value})
+                        ht_memory.append(getsizeof(value))
 
-        avg_db_search_time = mean(db_time) if db_time else 0
-        avg_redis_search_time = mean(redis_time) if redis_time else 0
-        avg_ht_search_time = mean(hash_table_time) if redis_time else 0
+            print('Данные внесены. Поиск данных...')
+            for i in range(record_number):
+                random_data = get_random_data(record_number)
+                key = random_data["key"]
+                value = random_data["value"]
 
-        db_search_times[filling_probability].append(avg_db_search_time)
-        redis_search_times[filling_probability].append(avg_redis_search_time)
-        ht_search_times[filling_probability].append(avg_ht_search_time)
+                if key in hash_table:
+                    start = time.monotonic()
+                    value = hash_table.get(key)
+                    end = time.monotonic()
+                    hash_table_time.append(end - start)
+                else:
+                    ht_misses_counter += 1
+                    hash_table.update({key: value})
 
-        db_memory_usage[(record_number, filling_probability)] = sum(db_memory)
-        redis_memory_usage[(record_number, filling_probability)] = sum(redis_memory)
-        ht_memory_usage[(record_number, filling_probability)] = sum(ht_memory)
+                if not redis_conn.get_data(key):
+                    redis_misses_counter += 1
+                    start = time.monotonic()
+                    db_data = postgres_conn.get_data(key)
+                    if db_data:
+                        end = time.monotonic()
+                        db_time.append(end - start)
+                        db_memory.append(getsizeof(db_data['value']))
+                        redis_conn.set_data(db_data['key'], db_data['value'])
+                    else:
+                        db_misses_counter += 1
+                        postgres_conn.set_data(key, value)
+                        db_memory.append(getsizeof(value))
+                        redis_conn.set_data(key, value)
+                else:
+                    start = time.monotonic()
+                    data = redis_conn.get_data(key)
+                    end = time.monotonic()
+                    redis_time.append(end - start)
+                    redis_memory.append(getsizeof(data))
 
-        db_misses_data[filling_probability].append(db_misses_counter)
-        redis_misses_data[filling_probability].append(redis_misses_counter)
-        ht_misses_data[filling_probability].append(ht_misses_counter)
+            avg_db_search_time = mean(db_time) if db_time else 0
+            avg_redis_search_time = mean(redis_time) if redis_time else 0
+            avg_ht_search_time = mean(hash_table_time) if redis_time else 0
 
-        print('\nОчистка данных...')
-        hash_table.clear()
-        postgres_conn.clear_data()
-        redis_conn.clear_data()
-        print('Все данные удалены\n')
+            db_search_times[filling_probability].append(avg_db_search_time)
+            redis_search_times[filling_probability].append(avg_redis_search_time)
+            ht_search_times[filling_probability].append(avg_ht_search_time)
+
+            db_memory_usage[(record_number, filling_probability)] = sum(db_memory)
+            redis_memory_usage[(record_number, filling_probability)] = sum(redis_memory)
+            ht_memory_usage[(record_number, filling_probability)] = sum(ht_memory)
+
+            db_misses_data[filling_probability].append(db_misses_counter)
+            redis_misses_data[filling_probability].append(redis_misses_counter)
+            ht_misses_data[filling_probability].append(ht_misses_counter)
+
+            print('\nОчистка данных...')
+            hash_table.clear()
+            postgres_conn.clear_data()
+            redis_conn.clear_data()
+            print('Все данные удалены\n')
+
+
+pool.apply(calculating())
+pool.close()
 
 postgres_conn.close()
 redis_conn.close()
@@ -184,7 +196,8 @@ for filling_probability in filling_probabilities:
     plt.plot(x, [t * 1e6 for t in ht_search_times[filling_probability]],
              label=f'Хэш-таблица (Среднее: {avg_ht_search_time * 1e6:.2f} мс)')
 
-    plt.title(f'Среднее время доступа vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+    plt.title(
+        f'Среднее время доступа vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
     plt.xlabel('Количество записей')
     plt.ylabel('Среднее время доступа (наносекунды)')
     plt.legend()
@@ -201,7 +214,8 @@ for filling_probability in filling_probabilities:
     plt.plot(x, redis_misses_data[filling_probability], label='Промахи Redis')
     plt.plot(x, ht_misses_data[filling_probability], label='Промахи хэш-таблицы')
 
-    plt.title(f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+    plt.title(
+        f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
     plt.xlabel('Количество записей')
     plt.ylabel('Количество промахов')
     plt.legend()

@@ -13,7 +13,7 @@ class PostgreSQL:
 
     def create_table(self):
         cursor = self.connection.cursor()
-        cursor.execute(f'CREATE TABLE {self.dbname} (key NUMERIC PRIMARY KEY, value NUMERIC);')
+        cursor.execute(f'CREATE TABLE IF NOT EXISTS {self.dbname} (key NUMERIC PRIMARY KEY, value NUMERIC);')
         self.connection.commit()
         cursor.close()
 
