@@ -59,9 +59,12 @@ redis_misses = {}
 ht_misses = {}
 
 # Всего записей занести в структуры
+# records_number = [1_000, 5_000, 10_000, 20_000, 50_000, 100_000,
+#                   200_000, 500_000, 1_000_000, 2_000_000, 5_000_000,
+#                   10_000_000]
+
 records_number = [1_000, 5_000, 10_000, 20_000, 50_000, 100_000,
-                  200_000, 500_000, 1_000_000, 2_000_000, 5_000_000,
-                  10_000_000]
+                  200_000, 500_000, 1_000_000]
 filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
 
 # Инициализация списков для хранения данных для графиков
@@ -71,11 +74,10 @@ db_search_times = {filling_probability: [] for filling_probability in filling_pr
 redis_search_times = {filling_probability: [] for filling_probability in filling_probabilities}
 ht_search_times = {filling_probability: [] for filling_probability in filling_probabilities}
 
+
 db_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 redis_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 ht_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
-
-pool = multiprocessing.Pool()
 
 
 def calculating():
@@ -153,7 +155,7 @@ def calculating():
 
             avg_db_search_time = mean(db_time) if db_time else 0
             avg_redis_search_time = mean(redis_time) if redis_time else 0
-            avg_ht_search_time = mean(hash_table_time) if redis_time else 0
+            avg_ht_search_time = mean(hash_table_time) if hash_table_time else 0
 
             db_search_times[filling_probability].append(avg_db_search_time)
             redis_search_times[filling_probability].append(avg_redis_search_time)
@@ -173,52 +175,53 @@ def calculating():
             redis_conn.clear_data()
             print('Все данные удалены\n')
 
+        # Графики для времени доступа
+        plt.figure(figsize=(10, 6))
+        x = records_number
 
-pool.apply(calculating())
-pool.close()
+        avg_db_search_time = mean(db_search_times[filling_probability])
+        avg_redis_search_time = mean(redis_search_times[filling_probability])
+        avg_ht_search_time = mean(ht_search_times[filling_probability])
 
-postgres_conn.close()
-redis_conn.close()
+        plt.plot(x, [t * 1e6 for t in db_search_times[filling_probability]],
+                 label=f'БД (Среднее: {avg_db_search_time * 1e6:.2f} мс)')
+        plt.plot(x, [t * 1e6 for t in redis_search_times[filling_probability]],
+                 label=f'Redis (Среднее: {avg_redis_search_time * 1e6:.2f} мс)')
+        plt.plot(x, [t * 1e6 for t in ht_search_times[filling_probability]],
+                 label=f'Хэш-таблица (Среднее: {avg_ht_search_time * 1e6:.2f} мс)')
 
-# Графики для времени доступа
-for filling_probability in filling_probabilities:
-    plt.figure(figsize=(10, 6))
-    x = records_number
+        plt.title(
+            f'Среднее время доступа vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+        plt.xlabel('Количество записей')
+        plt.ylabel('Среднее время доступа (наносекунды)')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f'app_results/время_доступа_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
+        plt.close()
 
-    avg_db_search_time = mean(db_search_times[filling_probability])
-    avg_redis_search_time = mean(redis_search_times[filling_probability])
-    avg_ht_search_time = mean(ht_search_times[filling_probability])
+        # Графики для количества промахов
+        plt.figure(figsize=(10, 6))
+        x = records_number
 
-    plt.plot(x, [t * 1e6 for t in db_search_times[filling_probability]],
-             label=f'БД (Среднее: {avg_db_search_time * 1e6:.2f} мс)')
-    plt.plot(x, [t * 1e6 for t in redis_search_times[filling_probability]],
-             label=f'Redis (Среднее: {avg_redis_search_time * 1e6:.2f} мс)')
-    plt.plot(x, [t * 1e6 for t in ht_search_times[filling_probability]],
-             label=f'Хэш-таблица (Среднее: {avg_ht_search_time * 1e6:.2f} мс)')
+        plt.plot(x, db_misses_data[filling_probability], label='Промахи БД')
+        plt.plot(x, redis_misses_data[filling_probability], label='Промахи Redis')
+        plt.plot(x, ht_misses_data[filling_probability], label='Промахи хэш-таблицы')
 
-    plt.title(
-        f'Среднее время доступа vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
-    plt.xlabel('Количество записей')
-    plt.ylabel('Среднее время доступа (наносекунды)')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'app_results/время_доступа_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
-    plt.close()
+        plt.title(
+            f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+        plt.xlabel('Количество записей')
+        plt.ylabel('Количество промахов')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f'app_results/промахи_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
+        plt.close()
 
-# Графики для количества промахов
-for filling_probability in filling_probabilities:
-    plt.figure(figsize=(10, 6))
-    x = records_number
 
-    plt.plot(x, db_misses_data[filling_probability], label='Промахи БД')
-    plt.plot(x, redis_misses_data[filling_probability], label='Промахи Redis')
-    plt.plot(x, ht_misses_data[filling_probability], label='Промахи хэш-таблицы')
+if __name__ == "__main__":
+    pool = multiprocessing.Pool()
+    pool.apply(calculating)
+    pool.close()
+    pool.join()
 
-    plt.title(
-        f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
-    plt.xlabel('Количество записей')
-    plt.ylabel('Количество промахов')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'app_results/промахи_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
-    plt.close()
+    postgres_conn.close()
+    redis_conn.close()
