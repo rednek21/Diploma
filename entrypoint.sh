@@ -13,5 +13,6 @@ fi
 
 sleep 5
 python main.py
+python plots.py
 
 exec "$@"

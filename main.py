@@ -1,6 +1,9 @@
 import multiprocessing
 import os
 import time
+
+import pandas as pd
+
 from random import uniform
 from sys import getsizeof
 from dotenv import load_dotenv
@@ -58,14 +61,13 @@ db_misses = {}
 redis_misses = {}
 ht_misses = {}
 
-# Всего записей занести в структуры
-# records_number = [1_000, 5_000, 10_000, 20_000, 50_000, 100_000,
-#                   200_000, 500_000, 1_000_000, 2_000_000, 5_000_000,
-#                   10_000_000]
+# Всего записей занести в структуры1_000_000
+records_number = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000,
+                  100_000, 200_000, 500_000]
+filling_probabilities = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
 
-records_number = [1_000, 5_000, 10_000, 20_000, 50_000, 100_000,
-                  200_000, 500_000, 1_000_000]
-filling_probabilities = [0.5, 0.6, 0.7, 0.8, 0.9]
+# records_number = [1_000, 5_000, 10_000]
+# filling_probabilities = [0.5, 0.6, 0.7]
 
 # Инициализация списков для хранения данных для графиков
 probabilities = []
@@ -73,7 +75,6 @@ probabilities = []
 db_search_times = {filling_probability: [] for filling_probability in filling_probabilities}
 redis_search_times = {filling_probability: [] for filling_probability in filling_probabilities}
 ht_search_times = {filling_probability: [] for filling_probability in filling_probabilities}
-
 
 db_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
 redis_misses_data = {filling_probability: [] for filling_probability in filling_probabilities}
@@ -203,9 +204,13 @@ def calculating():
         plt.figure(figsize=(10, 6))
         x = records_number
 
-        plt.plot(x, db_misses_data[filling_probability], label='Промахи БД')
-        plt.plot(x, redis_misses_data[filling_probability], label='Промахи Redis')
-        plt.plot(x, ht_misses_data[filling_probability], label='Промахи хэш-таблицы')
+        avg_db_misses = mean(db_misses_data[filling_probability])
+        avg_redis_misses = mean(redis_misses_data[filling_probability])
+        avg_ht_misses = mean(ht_misses_data[filling_probability])
+
+        plt.plot(x, db_misses_data[filling_probability], label=f'Промахи БД (Среднее: {avg_db_misses:.2f})')
+        plt.plot(x, redis_misses_data[filling_probability], label=f'Промахи Redis (Среднее: {avg_redis_misses:.2f})')
+        plt.plot(x, ht_misses_data[filling_probability], label=f'Промахи хэш-таблицы (Среднее: {avg_ht_misses:.2f})')
 
         plt.title(
             f'Количество промахов vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
@@ -215,6 +220,56 @@ def calculating():
         plt.grid(True)
         plt.savefig(f'app_results/промахи_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
         plt.close()
+
+        # Графики для занимаемой памяти
+        plt.figure(figsize=(10, 6))
+        x = records_number
+
+        db_memory_usage_values = [db_memory_usage[(rn, filling_probability)] for rn in records_number]
+        redis_memory_usage_values = [redis_memory_usage[(rn, filling_probability)] for rn in records_number]
+        ht_memory_usage_values = [ht_memory_usage[(rn, filling_probability)] for rn in records_number]
+
+        avg_db_memory_usage = mean(db_memory_usage_values)
+        avg_redis_memory_usage = mean(redis_memory_usage_values)
+        avg_ht_memory_usage = mean(ht_memory_usage_values)
+
+        plt.plot(x, db_memory_usage_values, label=f'Память БД (Среднее: {avg_db_memory_usage / 1024:.2f} КБ)')
+        plt.plot(x, redis_memory_usage_values, label=f'Память Redis (Среднее: {avg_redis_memory_usage / 1024:.2f} КБ)')
+        plt.plot(x, ht_memory_usage_values, label=f'Память хэш-таблицы (Среднее: {avg_ht_memory_usage / 1024:.2f} КБ)')
+
+        plt.title(
+            f'Память vs Количество записей (Вероятность заполнения БД: {f"{filling_probability:.2f}"}, Хэш-таблица: {f"{1 - filling_probability:.2f}"})')
+        plt.xlabel('Количество записей')
+        plt.ylabel('Память (Килобайты)')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f'app_results/память_vs_количество_записей_заполнение_{f"{filling_probability:.2f}"}.png')
+        plt.close()
+
+    # Создание сводной таблицы для Excel
+    columns = ['record_number', 'filling_probability', 'avg_db_search_time', 'avg_redis_search_time', 'avg_ht_search_time',
+               'db_misses', 'redis_misses', 'ht_misses', 'db_memory_usage', 'redis_memory_usage', 'ht_memory_usage']
+    data = []
+
+    for filling_probability in filling_probabilities:
+        for record_number in records_number:
+            row = [
+                record_number,
+                filling_probability,
+                mean(db_search_times[filling_probability]) * 1e3,
+                mean(redis_search_times[filling_probability]) * 1e3,
+                mean(ht_search_times[filling_probability]) * 1e3,
+                mean(db_misses_data[filling_probability]),
+                mean(redis_misses_data[filling_probability]),
+                mean(ht_misses_data[filling_probability]),
+                sum([db_memory_usage[(record_number, fp)] for fp in filling_probabilities if fp == filling_probability]) / 1024,
+                sum([redis_memory_usage[(record_number, fp)] for fp in filling_probabilities if fp == filling_probability]) / 1024,
+                sum([ht_memory_usage[(record_number, fp)] for fp in filling_probabilities if fp == filling_probability]) / 1024
+            ]
+            data.append(row)
+
+    df = pd.DataFrame(data, columns=columns)
+    df.to_excel('app_results/summary_table.xlsx', index=False)
 
 
 if __name__ == "__main__":
