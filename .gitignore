@@ -2,3 +2,8 @@
 __pycache__/
 *.py[cod]
 app_results/*
+<<<<<<< HEAD
+results/*
+=======
+results
+>>>>>>> f965e23469c77f0543ee73281d68b4a93da82f63
